@@ -327,11 +327,13 @@ html,body{height:100%;overflow:hidden;font-family:'Roboto',sans-serif;color:var(
   :root{--topH:50px;--sideW:100%;--drawerW:100%;}
 
   /* topbar compact */
-  .topbar{padding:0 10px;gap:8px;}
+  .topbar{padding:0 10px;gap:6px;}
   .logo-text{font-size:15px;}
   .trip-name{display:none;}
-  .where-wrap{display:none;}
   .save-dot{display:none;}
+  .where-wrap{flex:1;min-width:0;height:36px;padding:0 10px;gap:5px;}
+  .where-lbl{font-size:11px;}
+  .where-input{width:auto;flex:1;min-width:0;font-size:12px;}
   .btn-add{height:36px;padding:0 14px;font-size:13px;}
 
   /* shell */
