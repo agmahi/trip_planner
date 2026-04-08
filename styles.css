@@ -299,15 +299,18 @@ html,body{height:100%;overflow:hidden;font-family:'Roboto',sans-serif;color:var(
 .dist-toggle:hover{background:var(--blue-lt);border-color:var(--blue);color:var(--blue);}
 .dist-toggle.active{background:var(--blue);color:white;border-color:var(--blue);}
 .dist-toggle.loading{opacity:.7;pointer-events:none;}
+.dist-label-wrap{position:relative;width:0;height:0;overflow:visible!important;}
 .dist-label{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   background:white;border:1px solid var(--divider);border-radius:8px;
   padding:4px 8px;font-family:'Roboto',sans-serif;font-size:10px;
   color:var(--t1);white-space:nowrap;line-height:1.4;text-align:center;
   box-shadow:0 2px 8px rgba(0,0,0,.15);
-  transform:translate(-50%,-50%);
 }
 .dist-label .dl-dist{font-weight:500;color:var(--blue);}
 .dist-label .dl-time{color:var(--t2);}
+/* override leaflet clipping on dist icons */
+.leaflet-marker-icon.dist-icon{overflow:visible!important;}
 
 /* ══ MOBILE BOTTOM NAV ══ */
 .mob-nav{

@@ -848,12 +848,12 @@ function placeDistLabel(a,b,data){
     timeStr=m>0?h+'h '+m+'m':h+'h';
   }
 
-  const html=`<div class="dist-label">
+  const html=`<div class="dist-label-wrap"><div class="dist-label">
     <div class="dl-dist">${km.toFixed(0)} km (${mi.toFixed(0)} mi)</div>
     <div class="dl-time">\u{1F552} ${timeStr} drive</div>
-  </div>`;
+  </div></div>`;
 
-  const icon=L.divIcon({className:'',html:html,iconSize:[0,0],iconAnchor:[0,0]});
+  const icon=L.divIcon({className:'dist-icon',html:html,iconSize:[0,0],iconAnchor:[0,0]});
   const marker=L.marker([midLat,midLng],{icon:icon,interactive:false,zIndexOffset:-100}).addTo(map);
   distLabels.push(marker);
 }
