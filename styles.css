@@ -301,9 +301,10 @@ html,body{height:100%;overflow:hidden;font-family:'Roboto',sans-serif;color:var(
 .dist-toggle.loading{opacity:.7;pointer-events:none;}
 .dist-label{
   background:white;border:1px solid var(--divider);border-radius:8px;
-  padding:5px 10px;font-family:'Roboto',sans-serif;font-size:11px;
-  color:var(--t1);white-space:nowrap;line-height:1.5;text-align:center;
+  padding:4px 8px;font-family:'Roboto',sans-serif;font-size:10px;
+  color:var(--t1);white-space:nowrap;line-height:1.4;text-align:center;
   box-shadow:0 2px 8px rgba(0,0,0,.15);
+  transform:translate(-50%,-50%);
 }
 .dist-label .dl-dist{font-weight:500;color:var(--blue);}
 .dist-label .dl-time{color:var(--t2);}
