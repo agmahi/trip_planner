@@ -20,12 +20,12 @@
   <div class="spacer"></div>
   <div class="save-dot" id="saveDot" title="Saved"></div>
   <div class="trip-code-badge" id="tripCodeBadge" style="display:none" onclick="copyTripCode()" title="Click to copy trip code">
-    <span style="font-size:11px;color:var(--t3)">Code:</span>
+    <span class="code-lbl" style="font-size:11px;color:var(--t3)">Code:</span>
     <span id="tripCodeDisplay" style="font-family:monospace;font-weight:600;font-size:13px;color:var(--blue);letter-spacing:1px"></span>
     <span style="font-size:11px;color:var(--t3)">📋</span>
   </div>
   <div class="where-wrap">
-    <span class="where-lbl">📅 Where am I on</span>
+    <span class="where-lbl"><span class="where-lbl-icon">📅</span><span class="where-lbl-text"> Where am I on</span></span>
     <input type="date" class="where-input" id="finderDate" oninput="findLocation(this.value)" onchange="findLocation(this.value)"/>
   </div>
   <button class="btn-add" onclick="openStopModal('add')">
