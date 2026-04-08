@@ -776,6 +776,95 @@ function findLocation(date){
 }
 function closeStrip(){document.getElementById('resultStrip').classList.remove('on');document.getElementById('finderDate').value='';}
 
+/* ════════════ DRIVING DISTANCES ════════════ */
+let distLabels=[], distVisible=false, distCache={};
+
+function toggleDistances(){
+  const btn=document.getElementById('distToggle');
+  if(distVisible){
+    clearDistLabels();
+    distVisible=false;
+    btn.classList.remove('active');
+  }else{
+    distVisible=true;
+    btn.classList.add('active');
+    fetchAllDistances();
+  }
+}
+
+function clearDistLabels(){
+  distLabels.forEach(m=>map.removeLayer(m));
+  distLabels=[];
+}
+
+async function fetchAllDistances(){
+  const geo=stops.filter(s=>s.mapped);
+  if(geo.length<2){toast('Need at least 2 mapped stops.');distVisible=false;document.getElementById('distToggle').classList.remove('active');return;}
+
+  const btn=document.getElementById('distToggle');
+  btn.classList.add('loading');
+  btn.textContent='\u{1F504} Loading...';
+  clearDistLabels();
+
+  for(let i=0;i<geo.length-1;i++){
+    const a=geo[i], b=geo[i+1];
+    const key=`${a.lat},${a.lng}-${b.lat},${b.lng}`;
+    let data=distCache[key];
+    if(!data){
+      try{
+        const url=`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=false`;
+        const r=await fetch(url,{signal:AbortSignal.timeout(8000)});
+        const json=await r.json();
+        if(json.code==='Ok'&&json.routes&&json.routes.length){
+          const route=json.routes[0];
+          data={distance:route.distance,duration:route.duration};
+          distCache[key]=data;
+        }
+      }catch(e){console.warn('OSRM fetch failed for segment',i,e);}
+    }
+    if(data){
+      placeDistLabel(a,b,data);
+    }
+  }
+
+  btn.classList.remove('loading');
+  btn.textContent='\u{1F697} Distances';
+}
+
+function placeDistLabel(a,b,data){
+  const midLat=(a.lat+b.lat)/2;
+  const midLng=(a.lng+b.lng)/2;
+
+  const km=data.distance/1000;
+  const mi=km*0.621371;
+  const hrs=data.duration/3600;
+
+  let timeStr;
+  if(hrs<1){
+    timeStr=Math.round(hrs*60)+' min';
+  }else{
+    const h=Math.floor(hrs);
+    const m=Math.round((hrs-h)*60);
+    timeStr=m>0?h+'h '+m+'m':h+'h';
+  }
+
+  const html=`<div class="dist-label">
+    <div class="dl-dist">${km.toFixed(0)} km (${mi.toFixed(0)} mi)</div>
+    <div class="dl-time">\u{1F552} ${timeStr} drive</div>
+  </div>`;
+
+  const icon=L.divIcon({className:'',html:html,iconSize:[0,0],iconAnchor:[0,0]});
+  const marker=L.marker([midLat,midLng],{icon:icon,interactive:false,zIndexOffset:-100}).addTo(map);
+  distLabels.push(marker);
+}
+
+// Refresh distance labels when route changes (if visible)
+const origDrawRoute=drawRoute;
+drawRoute=function(){
+  origDrawRoute();
+  if(distVisible){clearDistLabels();fetchAllDistances();}
+};
+
 /* ════════════ UTILS ════════════ */
 const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DOW=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
