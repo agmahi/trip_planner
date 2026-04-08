@@ -8,6 +8,8 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <link rel="stylesheet" href="styles.css"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 </head>
 <body>
 
@@ -21,6 +23,11 @@
   </div>
   <div class="spacer"></div>
   <div class="save-dot" id="saveDot" title="Saved"></div>
+  <div class="trip-code-badge" id="tripCodeBadge" style="display:none" onclick="copyTripCode()" title="Click to copy trip code">
+    <span style="font-size:11px;color:var(--t3)">Code:</span>
+    <span id="tripCodeDisplay" style="font-family:monospace;font-weight:600;font-size:13px;color:var(--blue);letter-spacing:1px"></span>
+    <span style="font-size:11px;color:var(--t3)">📋</span>
+  </div>
   <div class="where-wrap">
     <span class="where-lbl">📅 Where am I on</span>
     <input type="date" class="where-input" id="finderDate" oninput="findLocation(this.value)" onchange="findLocation(this.value)"/>
@@ -153,6 +160,40 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- JOIN / CREATE TRIP -->
+<div class="overlay on" id="joinOverlay">
+  <div class="modal" style="width:400px">
+    <div class="modal-hd">
+      <div class="modal-title">Join a Trip</div>
+    </div>
+    <div class="modal-body" style="gap:18px">
+      <div style="text-align:center;font-size:14px;color:var(--t2);line-height:1.6">
+        Share a trip code with your group so everyone stays on the same page.
+      </div>
+      <div class="mf"><label>Your Name</label>
+        <input type="text" id="joinName" placeholder="e.g. Amahi's Family" autocomplete="off"/>
+      </div>
+      <div class="mf"><label>Trip Code</label>
+        <input type="text" id="joinCode" placeholder="Enter code to join an existing trip" autocomplete="off"
+          style="text-transform:uppercase;letter-spacing:2px;font-weight:500;font-size:18px;text-align:center"/>
+      </div>
+      <button class="btn-ok" style="width:100%;height:42px" onclick="joinTrip()">Join Trip</button>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="flex:1;height:1px;background:var(--divider)"></div>
+        <span style="font-size:12px;color:var(--t3)">OR</span>
+        <div style="flex:1;height:1px;background:var(--divider)"></div>
+      </div>
+      <button class="btn-cancel" style="width:100%;border:1px solid var(--divider);height:42px" onclick="createTrip()">Create New Trip</button>
+    </div>
+  </div>
+</div>
+
+<!-- SYNC STATUS (shown in topbar area) -->
+<div class="sync-badge" id="syncBadge">
+  <div class="sync-dot" id="syncDot"></div>
+  <span id="syncText">Connecting...</span>
+</div>
 
 <script src="app.js"></script>
 </body>

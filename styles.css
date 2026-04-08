@@ -365,6 +365,37 @@ html,body{height:100%;overflow:hidden;font-family:'Roboto',sans-serif;color:var(
   .toast{bottom:68px;}
 }
 
+/* ══ SYNC & TRIP CODE ══ */
+.sync-badge{
+  position:fixed;bottom:8px;right:12px;z-index:999;
+  display:flex;align-items:center;gap:6px;
+  background:var(--surface);border:1px solid var(--divider);
+  border-radius:16px;padding:4px 12px;font-size:11px;color:var(--t2);
+  box-shadow:0 2px 8px rgba(0,0,0,.1);
+}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:var(--yellow);flex-shrink:0;transition:background .3s;}
+.sync-dot.connected{background:var(--green);}
+.sync-dot.error{background:var(--red);}
+.trip-code-badge{
+  display:flex;align-items:center;gap:6px;
+  border:1px dashed var(--divider);border-radius:16px;
+  padding:4px 12px;cursor:pointer;transition:background .15s;flex-shrink:0;
+}
+.trip-code-badge:hover{background:var(--blue-lt);border-color:var(--blue);}
+.sync-update{
+  animation:syncPulse .6s ease;
+}
+@keyframes syncPulse{
+  0%{box-shadow:0 0 0 0 rgba(52,168,83,.4)}
+  70%{box-shadow:0 0 0 8px rgba(52,168,83,0)}
+  100%{box-shadow:none}
+}
+
+@media(max-width:768px){
+  .sync-badge{bottom:60px;right:8px;}
+  .trip-code-badge{display:none !important;}
+}
+
 /* small phones */
 @media(max-width:400px){
   .logo-icon{width:28px;height:28px;font-size:14px;}
