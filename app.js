@@ -67,7 +67,7 @@ const DEFAULT_STOPS=[
      {id:3001,date:'2026-06-05',time:'10:00',name:'Emerald Bay State Park',note:'Stunning panoramic views'},
      {id:3002,date:'2026-06-05',time:'14:00',name:'Sand Harbor Beach',note:'Lunch and swimming'},
    ]},
-  {id:4,location:'San Francisco, California',lat:37.7749,lng:-122.4194,mapped:true,
+  {id:4,location:'San Jose, California',lat:37.2867,lng:-121.8829,mapped:true,
    arrival:'2026-06-06',departure:'2026-06-10',stay:'Agastya Home',activity:'Rest & Local SF Spots',
    notes:[{id:103,type:'general',text:'Rest days and exploring local SF neighborhoods'}],
    events:[
