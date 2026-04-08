@@ -17,10 +17,6 @@
 <header class="topbar">
   <div class="logo"><div class="logo-icon">✈</div><div class="logo-text">Trip<span>Planner</span></div></div>
   <div class="trip-name" id="tripNameEl" onclick="renameTripPrompt()">USA Trip 2026</div>
-  <div class="search-bar">
-    <input type="text" id="topSearch" placeholder="Search destination and click ADD…" onkeydown="if(event.key==='Enter')openStopModal('add')"/>
-    <span class="search-ico">🔍</span>
-  </div>
   <div class="spacer"></div>
   <div class="save-dot" id="saveDot" title="Saved"></div>
   <div class="trip-code-badge" id="tripCodeBadge" style="display:none" onclick="copyTripCode()" title="Click to copy trip code">
@@ -59,7 +55,7 @@
       <div class="empty" id="emptyState" style="display:none">
         <div class="empty-ico">🗺️</div>
         <div class="empty-title">No stops yet</div>
-        <div class="empty-sub">Type a city and click <strong>ADD</strong>.</div>
+        <div class="empty-sub">Click <strong>ADD</strong> to add your first stop.</div>
       </div>
       <div id="tlList"></div>
     </div>
@@ -94,6 +90,10 @@
       <div class="mc-hr"></div>
       <div class="mc-row">🌙 <strong id="mcNights">0</strong>&nbsp;nights</div>
       <button class="mc-btn" onclick="openDrawerForActive()">View Details →</button>
+      <div class="mc-swipe-hint" id="mcSwipeHint">
+        <span>← swipe →</span>
+        <div class="mc-dots" id="mcDots"></div>
+      </div>
     </div>
     <div class="geo-status" id="geoStatus"><div class="spinner"></div> Locating…</div>
   </div>

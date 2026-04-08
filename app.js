@@ -413,7 +413,7 @@ function openStopModal(mode,stopId){
     pendingNotes=s.notes?[...s.notes]:[];
     if(s.lat)selGeo={lat:s.lat,lng:s.lng,displayName:s.location};
   }else{
-    document.getElementById('mLoc').value=document.getElementById('topSearch').value.trim();
+    document.getElementById('mLoc').value='';
     ['mArr','mDep','mStay','mAct'].forEach(id=>{const el=document.getElementById(id);el.value='';if(id==='mDep')el.min='';});
   }
   document.getElementById('mNoteText').value='';renderNotesList();closeAc();
@@ -450,7 +450,6 @@ async function saveStop(){
       arrival:arr,departure:dep||arr,stay,activity:act,notes:[...pendingNotes],events:[]};
     if(selGeo){stop.lat=selGeo.lat;stop.lng=selGeo.lng;stop.mapped=true;}
     stops.push(stop);stops.sort((a,b)=>a.arrival.localeCompare(b.arrival));
-    document.getElementById('topSearch').value='';
     closeStopModal();
     if(stop.mapped){placeMarker(stop);drawRoute();}
     refreshIcons();renderTimeline();setActive(stop.id,false);
@@ -495,6 +494,14 @@ function updateMapCard(s){
   if(parts.length){mm.textContent=parts.join(' \u00b7 ');mm.style.display='block';}else mm.style.display='none';
   document.getElementById('mcNights').textContent=nightsBetween(s.arrival,s.departure);
   document.getElementById('mapCard').classList.add('on');
+  // render swipe dots
+  const dotsEl=document.getElementById('mcDots');
+  const hintEl=document.getElementById('mcSwipeHint');
+  if(dotsEl&&stops.length>1){
+    const idx=stops.findIndex(x=>x.id===s.id);
+    dotsEl.innerHTML=stops.map((_,j)=>`<div class="mc-dot${j===idx?' active':''}"></div>`).join('');
+    if(hintEl)hintEl.style.display='flex';
+  }else if(hintEl){hintEl.style.display='none';}
 }
 function removeStop(id){
   if(MK[id]){map.removeLayer(MK[id]);delete MK[id];}
@@ -904,6 +911,84 @@ setActive=function(id,fly){
 };
 const origOpenDrawer=openDrawer;
 openDrawer=function(id){origOpenDrawer(id);};
+
+/* ════════════ MAP CARD SWIPE ════════════ */
+(function initSwipe(){
+  const card=document.getElementById('mapCard');
+  if(!card)return;
+  let startX=0,startY=0,dx=0,swiping=false;
+  const THRESHOLD=50;
+
+  card.addEventListener('touchstart',e=>{
+    if(!isMobile()||stops.length<2)return;
+    const t=e.touches[0];
+    startX=t.clientX;startY=t.clientY;dx=0;swiping=true;
+    card.classList.add('swiping');
+  },{passive:true});
+
+  card.addEventListener('touchmove',e=>{
+    if(!swiping)return;
+    const t=e.touches[0];
+    dx=t.clientX-startX;
+    const dy=Math.abs(t.clientY-startY);
+    // if scrolling vertically, cancel swipe
+    if(dy>Math.abs(dx)){swiping=false;card.style.transform='';card.classList.remove('swiping');return;}
+    card.style.transform=`translateX(${dx}px)`;
+    card.style.opacity=Math.max(0.3,1-Math.abs(dx)/300);
+  },{passive:true});
+
+  card.addEventListener('touchend',()=>{
+    if(!swiping){card.style.transform='';card.style.opacity='';return;}
+    card.classList.remove('swiping');
+    swiping=false;
+
+    if(Math.abs(dx)<THRESHOLD){
+      // snap back
+      card.style.transform='';card.style.opacity='';
+      return;
+    }
+
+    const curIdx=stops.findIndex(s=>s.id===activeId);
+    let nextIdx;
+    if(dx<0){
+      // swipe left → next stop
+      nextIdx=curIdx+1;
+    }else{
+      // swipe right → previous stop
+      nextIdx=curIdx-1;
+    }
+
+    if(nextIdx<0||nextIdx>=stops.length){
+      // bounce back — no more stops in that direction
+      card.style.transform='';card.style.opacity='';
+      toast(dx<0?'Last stop':'First stop');
+      return;
+    }
+
+    // animate out
+    const dir=dx<0?'swipe-out-left':'swipe-out-right';
+    card.style.transform='';card.style.opacity='';
+    card.classList.add(dir);
+
+    setTimeout(()=>{
+      card.classList.remove(dir);
+      // switch to next stop
+      const next=stops[nextIdx];
+      if(next){
+        activeId=next.id;
+        refreshIcons();renderTimeline();
+        if(next.mapped){
+          map.flyTo([next.lat,next.lng],Math.max(map.getZoom(),9),{duration:0.8});
+          MK[next.id]?.openPopup();
+          updateMapCard(next);
+        }
+      }
+      // animate in
+      card.classList.add('swipe-in');
+      setTimeout(()=>card.classList.remove('swipe-in'),300);
+    },250);
+  });
+})();
 
 /* ════════════ BOOT ════════════ */
 function bootApp(stopsData,name){
