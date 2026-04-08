@@ -1,0 +1,686 @@
+/* ════════════ CONSTANTS ════════════ */
+const STORAGE_KEY = 'tripplanner_v4'; // bumped — clears old broken data
+const DEFAULT_TRIP = 'USA 2026';
+const COLORS = ['#4285f4','#ea4335','#34a853','#f9ab00','#9334e6','#e52592','#007b83','#e37400','#0097a7'];
+const NOTE_META = {
+  general:    {emoji:'📝',label:'General',    cls:'nt-general'},
+  hotel:      {emoji:'🏨',label:'Hotel',      cls:'nt-hotel'},
+  flight:     {emoji:'✈️', label:'Flight',     cls:'nt-flight'},
+  activity:   {emoji:'🎯',label:'Activity',   cls:'nt-activity'},
+  restaurant: {emoji:'🍽️',label:'Restaurant', cls:'nt-restaurant'},
+  transport:  {emoji:'🚌',label:'Transport',  cls:'nt-transport'},
+};
+
+/* ════════════ STATE ════════════ */
+let stops=[], activeId=null, drawerStopId=null, editingId=null, tripName=DEFAULT_TRIP;
+let map, routeLine;
+let pendingNotes=[], selNoteType='general', selGeo=null;
+let acTimer=null, acSel=-1, acRes=[];
+const MK={};
+const imgCache={};
+
+/* ════════════ DEFAULT DATA ════════════ */
+const DEFAULT_STOPS=[
+  {id:1,location:'San Francisco, California',lat:37.7749,lng:-122.4194,mapped:true,
+   arrival:'2025-05-28',departure:'2025-06-02',stay:'Agastya Home',activity:'Arrival & SF Sightseeing',
+   notes:[{id:101,type:'general',text:'Arrival day – settle in and explore the city'}],
+   events:[
+     {id:1001,date:'2025-05-28',time:'15:00',name:'Arrive at Agastya Home',note:'Check in, settle in'},
+     {id:1002,date:'2025-05-29',time:'10:00',name:'Golden Gate Bridge',note:'Morning walk across the bridge'},
+     {id:1003,date:'2025-05-29',time:'13:00',name:"Fisherman's Wharf",note:'Lunch and clam chowder'},
+     {id:1004,date:'2025-05-30',time:'09:00',name:'Alcatraz Tour',note:'Book tickets in advance'},
+   ]},
+  {id:2,location:'Yosemite / Mariposa, California',lat:37.8651,lng:-119.5383,mapped:true,
+   arrival:'2025-06-03',departure:'2025-06-05',stay:'Miners Inn',activity:'Yosemite National Park',
+   notes:[{id:102,type:'activity',text:'Yosemite National Park – hiking and sightseeing'}],
+   events:[
+     {id:2001,date:'2025-06-03',time:'08:00',name:'Arrive at Miners Inn',note:'Check in'},
+     {id:2002,date:'2025-06-03',time:'11:30',name:'Lower Yosemite Fall Trail',note:'Easy 1-mile loop, great views'},
+     {id:2003,date:'2025-06-03',time:'13:30',name:'Bridalveil Fall',note:'Short hike, misty and beautiful'},
+     {id:2004,date:'2025-06-03',time:'17:00',name:'Return to Miners Inn',note:'Rest and dinner'},
+     {id:2005,date:'2025-06-04',time:'07:00',name:'Half Dome Village',note:'Early start for Half Dome cables'},
+     {id:2006,date:'2025-06-04',time:'16:00',name:'Valley View Overlook',note:'Sunset photos'},
+   ]},
+  {id:3,location:'South Lake Tahoe, California',lat:38.9399,lng:-119.9772,mapped:true,
+   arrival:'2025-06-05',departure:'2025-06-06',stay:'Lakeside Lodge',activity:'Lake Tahoe Sightseeing',
+   notes:[{id:301,type:'activity',text:'Scenic drive and lake views'}],
+   events:[
+     {id:3001,date:'2025-06-05',time:'10:00',name:'Emerald Bay State Park',note:'Stunning panoramic views'},
+     {id:3002,date:'2025-06-05',time:'14:00',name:'Sand Harbor Beach',note:'Lunch and swimming'},
+   ]},
+  {id:4,location:'San Francisco, California',lat:37.7749,lng:-122.4194,mapped:true,
+   arrival:'2025-06-06',departure:'2025-06-10',stay:'Agastya Home',activity:'Rest & Local SF Spots',
+   notes:[{id:103,type:'general',text:'Rest days and exploring local SF neighborhoods'}],
+   events:[
+     {id:4001,date:'2025-06-07',time:'11:00',name:'Mission District Murals',note:'Street art walk'},
+     {id:4002,date:'2025-06-08',time:'10:00',name:'Ferry Building Marketplace',note:'Farmers market Saturday'},
+   ]},
+  {id:5,location:'Hollywood, Los Angeles, California',lat:34.0928,lng:-118.3287,mapped:true,
+   arrival:'2025-06-11',departure:'2025-06-12',stay:'Economy Inn',activity:'Walk of Fame & Griffith',
+   notes:[{id:104,type:'activity',text:'Hollywood Walk of Fame and Griffith Observatory'}],
+   events:[
+     {id:5001,date:'2025-06-11',time:'10:00',name:'Hollywood Walk of Fame',note:'See your favorite stars'},
+     {id:5002,date:'2025-06-11',time:'15:00',name:'Griffith Observatory',note:'Free admission, great city views'},
+   ]},
+  {id:6,location:'Anaheim, California',lat:33.8366,lng:-117.9143,mapped:true,
+   arrival:'2025-06-13',departure:'2025-06-15',stay:'Super 8',activity:'Universal Studios & Disneyland',
+   notes:[{id:105,type:'activity',text:'Universal Studios on Jun 13, Disneyland on Jun 15'}],
+   events:[
+     {id:6001,date:'2025-06-13',time:'09:00',name:'Universal Studios Hollywood',note:'Full day – buy tickets in advance'},
+     {id:6002,date:'2025-06-14',time:'12:00',name:'Downtown Disney',note:'Shopping and lunch'},
+     {id:6003,date:'2025-06-15',time:'08:00',name:'Disneyland Park',note:'Arrive early for shorter queues'},
+   ]},
+  {id:7,location:'Las Vegas, Nevada',lat:36.1699,lng:-115.1398,mapped:true,
+   arrival:'2025-06-16',departure:'2025-06-17',stay:'Desert Rose',activity:'Strip Walk / Shows',
+   notes:[{id:108,type:'activity',text:'Explore the Strip, Fremont Street'}],
+   events:[
+     {id:7001,date:'2025-06-16',time:'20:00',name:'Las Vegas Strip Walk',note:'Best experienced at night'},
+     {id:7002,date:'2025-06-17',time:'10:00',name:'Fremont Street Experience',note:'Downtown Las Vegas'},
+   ]},
+  {id:8,location:'Grand Canyon South Rim, Arizona',lat:36.0544,lng:-112.1401,mapped:true,
+   arrival:'2025-06-18',departure:'2025-06-19',stay:'Tusayan Hotel',activity:'South Rim & Watchtower',
+   notes:[{id:109,type:'activity',text:'Jun 18: Sunset at South Rim. Jun 19: Watchtower'}],
+   events:[
+     {id:8001,date:'2025-06-18',time:'14:00',name:'Arrive at South Rim',note:'Check in at Tusayan'},
+     {id:8002,date:'2025-06-18',time:'18:30',name:'Mather Point Sunset',note:'Best sunset viewpoint'},
+     {id:8003,date:'2025-06-19',time:'08:00',name:'Bright Angel Trail',note:'Morning hike down 1.5 miles'},
+     {id:8004,date:'2025-06-19',time:'13:00',name:'Desert View Watchtower',note:'Historic 1932 tower'},
+   ]},
+  {id:9,location:'Phoenix, Arizona',lat:33.4484,lng:-112.0740,mapped:true,
+   arrival:'2025-06-20',departure:'2025-06-20',stay:'Return Home',activity:'Flight PHX → SFO',
+   notes:[{id:111,type:'flight',text:'Flight from PHX back to SFO – check-in 2 hrs early'}],
+   events:[
+     {id:9001,date:'2025-06-20',time:'06:00',name:'Drive to PHX Airport',note:'Allow 3 hrs from Grand Canyon'},
+     {id:9002,date:'2025-06-20',time:'11:00',name:'Flight PHX → SFO',note:'Check flight time'},
+   ]},
+];
+
+/* ════════════ STORAGE ════════════ */
+function save(){
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify({tripName,stops}));flashSave();}
+  catch(e){console.warn('Save failed',e);}
+}
+function load(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(!raw) return false;
+    const d=JSON.parse(raw);
+    tripName=d.tripName||DEFAULT_TRIP;
+    stops=(d.stops||[]).map(s=>({
+      ...s,
+      notes:   s.notes   ||[],
+      events:  s.events  ||[],
+      stay:    s.stay    ||'',
+      activity:s.activity||'',
+    }));
+    stops.sort((a,b)=>a.arrival.localeCompare(b.arrival));
+    return stops.length>0;
+  }catch(e){return false;}
+}
+function flashSave(){
+  const d=document.getElementById('saveDot');
+  d.classList.add('on');clearTimeout(d._t);
+  d._t=setTimeout(()=>d.classList.remove('on'),1500);
+}
+
+/* ════════════ MAP ════════════ */
+map=L.map('map',{zoomControl:true}).setView([37,-100],5);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
+  attribution:'© <a href="https://openstreetmap.org">OSM</a> © <a href="https://carto.com">CARTO</a>',maxZoom:19
+}).addTo(map);
+
+function mkIcon(idx,active){
+  const c=COLORS[idx%COLORS.length],s=active?34:26;
+  return L.divIcon({className:'',
+    html:`<div style="width:${s}px;height:${s}px;position:relative">
+      <div style="width:${s}px;height:${s}px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+        background:${c};border:2.5px solid #fff;
+        box-shadow:${active?'0 3px 12px rgba(0,0,0,.35)':'0 2px 6px rgba(0,0,0,.22)'}"></div>
+      <div style="position:absolute;top:47%;left:50%;transform:translate(-48%,-52%);
+        font-size:${active?12:10}px;font-weight:700;color:#fff;
+        font-family:'Google Sans',sans-serif;line-height:1">${idx+1}</div>
+    </div>`,iconSize:[s,s],iconAnchor:[s/2,s],popupAnchor:[0,-s]});
+}
+function placeMarker(stop){
+  if(MK[stop.id])map.removeLayer(MK[stop.id]);
+  const i=stops.findIndex(s=>s.id===stop.id);
+  const m=L.marker([stop.lat,stop.lng],{icon:mkIcon(i,false)}).addTo(map)
+    .bindPopup(`<div class="pop-inner"><div class="pop-city">${stop.location}</div><div class="pop-dates">${fmtRange(stop.arrival,stop.departure)}</div></div>`,
+      {className:'gmpop',closeButton:false});
+  m.on('click',()=>setActive(stop.id,false));
+  MK[stop.id]=m;
+}
+function refreshIcons(){stops.forEach((s,i)=>{if(MK[s.id])MK[s.id].setIcon(mkIcon(i,s.id===activeId));});}
+function drawRoute(){
+  if(routeLine){map.removeLayer(routeLine);routeLine=null;}
+  const geo=stops.filter(s=>s.mapped);
+  if(geo.length<2)return;
+  routeLine=L.polyline(geo.map(s=>[s.lat,s.lng]),{color:'#4285f4',weight:3,opacity:.5,dashArray:'8 10'}).addTo(map);
+}
+// Notify leaflet whenever drawer opens/closes so it re-sizes correctly
+function invalidateMap(){setTimeout(()=>map.invalidateSize(),320);}
+
+/* ════════════ AUTOCOMPLETE ════════════ */
+function onLocInput(v){
+  selGeo=null;clearTimeout(acTimer);
+  const l=document.getElementById('acList');
+  if(v.length<2){l.classList.remove('on');l.innerHTML='';return;}
+  acTimer=setTimeout(()=>fetchAc(v),300);
+}
+async function fetchAc(q){
+  const l=document.getElementById('acList');
+  l.innerHTML=`<div class="ac-load"><div class="ac-spin"></div> Searching…</div>`;l.classList.add('on');
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=6&addressdetails=1`,
+      {headers:{'Accept-Language':'en'},signal:AbortSignal.timeout(5000)});
+    acRes=await r.json();acSel=-1;renderAc(acRes);
+  }catch(e){l.innerHTML=`<div class="ac-load">Could not fetch suggestions</div>`;}
+}
+function renderAc(res){
+  const l=document.getElementById('acList');
+  if(!res.length){l.innerHTML=`<div class="ac-load">No results found</div>`;return;}
+  l.innerHTML=res.map((r,i)=>{
+    const a=r.address||{};
+    const main=a.city||a.town||a.village||a.county||a.state||r.name||r.display_name.split(',')[0];
+    const parts=[];if(a.state)parts.push(a.state);if(a.country)parts.push(a.country);
+    const sub=parts.join(', ')||r.display_name.split(',').slice(1,3).join(',').trim();
+    return`<div class="ac-item" onclick="selAc(${i})"><span style="font-size:14px">📍</span>
+      <div><div class="ac-main">${main}</div><div class="ac-sub">${sub}</div></div></div>`;
+  }).join('');l.classList.add('on');
+}
+function selAc(i){
+  const r=acRes[i];if(!r)return;
+  const a=r.address||{};
+  const main=a.city||a.town||a.village||a.county||a.state||r.name||r.display_name.split(',')[0];
+  const parts=[];if(a.state)parts.push(a.state);if(a.country)parts.push(a.country);
+  const dn=parts.length?`${main}, ${parts.join(', ')}`:main;
+  document.getElementById('mLoc').value=dn;selGeo={lat:+r.lat,lng:+r.lon,displayName:dn};closeAc();
+}
+function closeAc(){const l=document.getElementById('acList');l.classList.remove('on');l.innerHTML='';acRes=[];acSel=-1;}
+function onLocKey(e){
+  const items=document.querySelectorAll('.ac-item');
+  if(e.key==='ArrowDown'){e.preventDefault();acSel=Math.min(acSel+1,items.length-1);items.forEach((el,i)=>el.classList.toggle('sel',i===acSel));}
+  else if(e.key==='ArrowUp'){e.preventDefault();acSel=Math.max(acSel-1,0);items.forEach((el,i)=>el.classList.toggle('sel',i===acSel));}
+  else if(e.key==='Enter'){e.preventDefault();if(acSel>=0&&acSel<acRes.length)selAc(acSel);else closeAc();}
+  else if(e.key==='Escape')closeAc();
+}
+document.addEventListener('click',e=>{if(!e.target.closest('.ac-wrap'))closeAc();});
+function onArrChange(){
+  const arr=document.getElementById('mArr').value,dep=document.getElementById('mDep');
+  if(arr){dep.min=arr;if(dep.value&&dep.value<arr)dep.value=arr;dep.focus();}
+}
+
+/* ════════════ NOTES ════════════ */
+function selNT(btn){document.querySelectorAll('.ntb').forEach(b=>b.classList.remove('on'));btn.classList.add('on');selNoteType=btn.dataset.type;}
+function addNote(){
+  const txt=document.getElementById('mNoteText').value.trim();if(!txt)return;
+  pendingNotes.push({id:Date.now(),type:selNoteType,text:txt});
+  document.getElementById('mNoteText').value='';renderNotesList();
+}
+function removeNote(id){pendingNotes=pendingNotes.filter(n=>n.id!==id);renderNotesList();}
+function renderNotesList(){
+  document.getElementById('notesList').innerHTML=pendingNotes.map(n=>{
+    const m=NOTE_META[n.type]||NOTE_META.general;
+    return`<div class="note-entry"><span class="note-type-chip ${m.cls}">${m.emoji} ${m.label}</span><span style="flex:1;font-size:13px;color:var(--t1)">${n.text}</span><button class="note-del" onclick="removeNote(${n.id})">✕</button></div>`;
+  }).join('');
+}
+
+/* ════════════ STOP MODAL ════════════ */
+function openStopModal(mode,stopId){
+  editingId=mode==='edit'?stopId:null;pendingNotes=[];selGeo=null;
+  document.getElementById('stopModalTitle').textContent=mode==='edit'?'Edit Stop':'Add a Stop';
+  document.getElementById('btnOk').textContent=mode==='edit'?'Save Changes':'Add to Itinerary';
+  document.querySelectorAll('.ntb').forEach(b=>b.classList.toggle('on',b.dataset.type==='general'));selNoteType='general';
+  if(mode==='edit'&&stopId){
+    const s=stops.find(x=>x.id===stopId);if(!s)return;
+    document.getElementById('mLoc').value=s.location;
+    document.getElementById('mArr').value=s.arrival;
+    document.getElementById('mDep').value=s.departure;
+    document.getElementById('mDep').min=s.arrival;
+    document.getElementById('mStay').value=s.stay||'';
+    document.getElementById('mAct').value=s.activity||'';
+    pendingNotes=s.notes?[...s.notes]:[];
+    if(s.lat)selGeo={lat:s.lat,lng:s.lng,displayName:s.location};
+  }else{
+    document.getElementById('mLoc').value=document.getElementById('topSearch').value.trim();
+    ['mArr','mDep','mStay','mAct'].forEach(id=>{const el=document.getElementById(id);el.value='';if(id==='mDep')el.min='';});
+  }
+  document.getElementById('mNoteText').value='';renderNotesList();closeAc();
+  document.getElementById('stopOverlay').classList.add('on');
+  setTimeout(()=>document.getElementById('mLoc').focus(),80);
+}
+function closeStopModal(){document.getElementById('stopOverlay').classList.remove('on');closeAc();editingId=null;}
+document.getElementById('stopOverlay').addEventListener('click',e=>{if(e.target===document.getElementById('stopOverlay'))closeStopModal();});
+
+/* ════════════ SAVE STOP ════════════ */
+async function saveStop(){
+  const locVal=document.getElementById('mLoc').value.trim();
+  const arr=document.getElementById('mArr').value;
+  const dep=document.getElementById('mDep').value;
+  const stay=document.getElementById('mStay').value.trim();
+  const act=document.getElementById('mAct').value.trim();
+  if(!locVal)return toast('Please enter a destination.');
+  if(!arr)return toast('Please select an arrival date.');
+  if(dep&&dep<arr)return toast('Departure must be after arrival.');
+
+  if(editingId){
+    const s=stops.find(x=>x.id===editingId);if(!s)return closeStopModal();
+    s.location=locVal;s.arrival=arr;s.departure=dep||arr;s.stay=stay;s.activity=act;s.notes=[...pendingNotes];
+    if(selGeo&&(selGeo.lat!==s.lat||selGeo.lng!==s.lng)){
+      s.lat=selGeo.lat;s.lng=selGeo.lng;s.mapped=true;
+      if(MK[s.id]){map.removeLayer(MK[s.id]);delete MK[s.id];}placeMarker(s);
+    }else if(!s.mapped&&!selGeo)geocodeBg(s);
+    stops.sort((a,b)=>a.arrival.localeCompare(b.arrival));
+    closeStopModal();drawRoute();refreshIcons();renderTimeline();setActive(s.id,s.mapped);
+    if(drawerStopId===s.id)openDrawer(s.id);
+    save();updateSidebarHeader();toast(`✏️ ${s.location} updated`);
+  }else{
+    const stop={id:Date.now(),location:locVal,lat:null,lng:null,mapped:false,
+      arrival:arr,departure:dep||arr,stay,activity:act,notes:[...pendingNotes],events:[]};
+    if(selGeo){stop.lat=selGeo.lat;stop.lng=selGeo.lng;stop.mapped=true;}
+    stops.push(stop);stops.sort((a,b)=>a.arrival.localeCompare(b.arrival));
+    document.getElementById('topSearch').value='';
+    closeStopModal();
+    if(stop.mapped){placeMarker(stop);drawRoute();}
+    refreshIcons();renderTimeline();setActive(stop.id,false);
+    if(stop.mapped){map.flyTo([stop.lat,stop.lng],Math.max(map.getZoom(),9),{duration:1.1});updateMapCard(stop);toast(`📍 ${stop.location} added`);}
+    else{toast(`📍 ${stop.location} added — locating on map…`);geocodeBg(stop);}
+    save();updateSidebarHeader();
+  }
+}
+
+async function geocodeBg(stop){
+  document.getElementById('geoStatus').classList.add('on');
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(stop.location)}&limit=1`,
+      {headers:{'Accept-Language':'en'},signal:AbortSignal.timeout(6000)});
+    const d=await r.json();
+    if(d.length){stop.lat=+d[0].lat;stop.lng=+d[0].lon;stop.mapped=true;placeMarker(stop);drawRoute();refreshIcons();renderTimeline();
+      if(activeId===stop.id){map.flyTo([stop.lat,stop.lng],Math.max(map.getZoom(),9),{duration:1.1});updateMapCard(stop);}save();}
+    else{stop.mapped=false;renderTimeline();toast(`⚠ Couldn't locate "${stop.location}"`);}
+  }catch(e){stop.mapped=false;renderTimeline();}
+  document.getElementById('geoStatus').classList.remove('on');
+}
+
+/* ════════════ SET ACTIVE ════════════ */
+function setActive(id,fly){
+  activeId=id;const s=stops.find(x=>x.id===id);if(!s)return;
+  refreshIcons();
+  if(s.mapped){
+    if(fly)map.flyTo([s.lat,s.lng],Math.max(map.getZoom(),9),{duration:1.1});
+    else map.panTo([s.lat,s.lng]);
+    MK[id]?.openPopup();updateMapCard(s);
+  }
+  renderTimeline();
+  setTimeout(()=>{const el=document.querySelector(`.day-block[data-id="${id}"]`);if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'});},60);
+}
+function updateMapCard(s){
+  const i=stops.findIndex(x=>x.id===s.id);
+  document.getElementById('mcLbl').textContent=`Stop ${i+1} of ${stops.length}`;
+  document.getElementById('mcCity').textContent=s.location;
+  document.getElementById('mcDates').textContent=fmtRange(s.arrival,s.departure);
+  const mm=document.getElementById('mcMeta');
+  const parts=[];if(s.stay)parts.push('🏨 '+s.stay);if(s.activity)parts.push('🎯 '+s.activity);
+  if(parts.length){mm.textContent=parts.join(' · ');mm.style.display='block';}else mm.style.display='none';
+  document.getElementById('mcNights').textContent=nightsBetween(s.arrival,s.departure);
+  document.getElementById('mapCard').classList.add('on');
+}
+function removeStop(id){
+  if(MK[id]){map.removeLayer(MK[id]);delete MK[id];}
+  stops=stops.filter(s=>s.id!==id);
+  if(activeId===id)activeId=stops.length?stops[0].id:null;
+  if(drawerStopId===id)closeDrawer();
+  renderTimeline();drawRoute();refreshIcons();
+  if(activeId)setActive(activeId,false);
+  else{document.getElementById('mapCard').classList.remove('on');if(!stops.length)map.setView([37,-100],5);}
+  updateSidebarHeader();save();
+}
+function focusStop(id){const s=stops.find(x=>x.id===id);if(s&&s.mapped){setActive(id,true);map.flyTo([s.lat,s.lng],13,{duration:1.2});}else toast('Still locating on map.');}
+
+/* ════════════ DRAWER ════════════ */
+function openDrawer(id){
+  const s=stops.find(x=>x.id===id);if(!s)return;
+  drawerStopId=id;
+  document.getElementById('dCity').textContent=s.location;
+  document.getElementById('dDates').textContent=fmtRange(s.arrival,s.departure)+(s.stay?' · '+s.stay:'');
+  renderDrawerBody(s);
+  document.getElementById('drawer').classList.add('open');
+  invalidateMap();
+  setActive(id,true);
+}
+function closeDrawer(){
+  document.getElementById('drawer').classList.remove('open');
+  drawerStopId=null;invalidateMap();
+}
+function openDrawerForActive(){if(activeId)openDrawer(activeId);}
+function editCurrentStop(){if(drawerStopId)openStopModal('edit',drawerStopId);}
+
+function renderDrawerBody(s){
+  const body=document.getElementById('drawerBody');
+  let html='';
+
+  // meta strip
+  if(s.stay||s.activity){
+    html+=`<div class="drawer-meta-strip">`;
+    if(s.stay)html+=`<div class="dms-item"><div class="dms-ico">🏨</div><div class="dms-body"><div class="dms-label">Stay</div><div class="dms-val">${s.stay}</div></div></div>`;
+    if(s.activity)html+=`<div class="dms-item"><div class="dms-ico">🎯</div><div class="dms-body"><div class="dms-label">Activity</div><div class="dms-val">${s.activity}</div></div></div>`;
+    html+=`</div>`;
+  }
+
+  // days
+  const days=daysInRange(s.arrival,s.departure);
+  days.forEach(dateStr=>{
+    const dayEvts=(s.events||[]).filter(e=>e.date===dateStr).sort((a,b)=>a.time.localeCompare(b.time));
+    const fid=`aef-${s.id}-${dateStr.replace(/-/g,'')}`;
+    const listId=`evtlist-${s.id}-${dateStr.replace(/-/g,'')}`;
+    html+=`
+    <div class="drawer-day-section">
+      <div class="drawer-day-header">
+        <div class="ddh-date">${fmtDateLong(dateStr)}</div>
+        <div class="ddh-right">
+          <span class="ddh-count">${dayEvts.length} event${dayEvts.length!==1?'s':''}</span>
+          <button class="ddh-add" onclick="showAddEvt('${fid}','${s.id}','${dateStr}')">+ Add</button>
+        </div>
+      </div>
+      <div class="evt-list" id="${listId}">`;
+
+    if(!dayEvts.length){
+      html+=`<div class="evt-empty">No events — click + Add to plan your day</div>`;
+    }else{
+      dayEvts.forEach((ev,ei)=>{
+        const[h,m]=ev.time.split(':');const hr=+h,ampm=hr>=12?'PM':'AM',h12=hr%12||12;
+        const isLast=ei===dayEvts.length-1;
+        html+=`
+        <div class="evt-item" id="evt-${ev.id}">
+          <div class="evt-time-col"><div class="evt-time">${h12}:${m}</div><div class="evt-ampm">${ampm}</div></div>
+          <div class="evt-dot-col"><div class="evt-dot"></div>${!isLast?'<div class="evt-vline"></div>':''}</div>
+          <div class="evt-body">
+            <div class="evt-name">${ev.name}</div>
+            ${ev.note?`<div class="evt-note">${ev.note}</div>`:''}
+            <div class="evt-img-row" id="imgs-${ev.id}">
+              <div class="evt-img-skel"></div><div class="evt-img-skel"></div>
+            </div>
+          </div>
+          <button class="evt-del" onclick="deleteEvt(${s.id},${ev.id})" title="Remove">✕</button>
+        </div>`;
+      });
+    }
+    html+=`</div>
+      <div class="add-evt-form" id="${fid}">
+        <div class="aef-row">
+          <input type="time" class="aef-input aef-time" id="${fid}-time" value="09:00"/>
+          <input type="text" class="aef-input aef-name" id="${fid}-name" placeholder="Event name (e.g. Bridalveil Fall)"
+            onkeydown="if(event.key==='Enter')saveEvt('${s.id}','${dateStr}','${fid}')"/>
+        </div>
+        <input type="text" class="aef-input" id="${fid}-note" placeholder="Note (optional)"
+          onkeydown="if(event.key==='Enter')saveEvt('${s.id}','${dateStr}','${fid}')"/>
+        <div class="aef-hint">💡 Photos of landmarks auto-load from Wikipedia</div>
+        <div class="aef-btns">
+          <button class="aef-save"   onclick="saveEvt('${s.id}','${dateStr}','${fid}')">Save</button>
+          <button class="aef-cancel" onclick="hideAddEvt('${fid}')">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  // notes
+  if(s.notes&&s.notes.length){
+    html+=`<div class="drawer-notes"><div class="dns-title">Notes</div>`;
+    s.notes.forEach(n=>{
+      const m=NOTE_META[n.type]||NOTE_META.general;
+      html+=`<div class="note-chip"><span class="ntc ${m.cls}">${m.emoji} ${m.label}</span><span class="note-text">${n.text}</span></div>`;
+    });
+    html+=`</div>`;
+  }
+
+  body.innerHTML=html;
+
+  // load images async
+  (s.events||[]).forEach(ev=>loadEvtImages(ev.id,ev.name));
+}
+
+function daysInRange(start,end){
+  const days=[];let d=new Date(start+'T12:00:00');const e=new Date(end+'T12:00:00');
+  while(d<=e){days.push(d.toISOString().split('T')[0]);d.setDate(d.getDate()+1);}
+  return days;
+}
+
+/* ── Event CRUD ── */
+function showAddEvt(fid,stopId,dateStr){
+  // close any other open forms
+  document.querySelectorAll('.add-evt-form.on').forEach(f=>{if(f.id!==fid)f.classList.remove('on');});
+  const f=document.getElementById(fid);if(!f)return;
+  f.classList.toggle('on');
+  if(f.classList.contains('on'))setTimeout(()=>document.getElementById(`${fid}-name`)?.focus(),50);
+}
+function hideAddEvt(fid){const f=document.getElementById(fid);if(f)f.classList.remove('on');}
+
+function saveEvt(stopId,dateStr,fid){
+  const sid=+stopId;const s=stops.find(x=>x.id===sid);if(!s)return;
+  const time=document.getElementById(`${fid}-time`).value||'09:00';
+  const name=document.getElementById(`${fid}-name`).value.trim();
+  const note=document.getElementById(`${fid}-note`).value.trim();
+  if(!name)return toast('Please enter an event name.');
+  if(!s.events)s.events=[];
+  const evId=Date.now();
+  s.events.push({id:evId,date:dateStr,time,name,note});
+  s.events.sort((a,b)=>a.date===b.date?a.time.localeCompare(b.time):a.date.localeCompare(b.date));
+  save();hideAddEvt(fid);renderDrawerBody(s);renderTimeline();toast(`✓ "${name}" added`);
+}
+
+function deleteEvt(stopId,evId){
+  const s=stops.find(x=>x.id===+stopId);if(!s)return;
+  s.events=(s.events||[]).filter(e=>e.id!==evId);
+  save();renderDrawerBody(s);renderTimeline();
+}
+
+/* ── Images ── */
+async function loadEvtImages(evId,query){
+  const row=document.getElementById(`imgs-${evId}`);if(!row)return;
+  if(imgCache[query]){renderImgs(row,imgCache[query]);return;}
+  try{
+    const url=`https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(query)}&prop=pageimages&pithumbsize=800&format=json&origin=*`;
+    const r=await fetch(url);const d=await r.json();
+    const pages=d.query?.pages||{};const imgs=[];
+    Object.values(pages).forEach(p=>{if(p.thumbnail?.source)imgs.push(p.thumbnail.source);});
+    if(imgs.length<2){
+      const url2=`https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(query)}&prop=images&imlimit=4&format=json&origin=*`;
+      const r2=await fetch(url2);const d2=await r2.json();
+      const pages2=d2.query?.pages||{};const titles=[];
+      Object.values(pages2).forEach(p=>(p.images||[]).slice(0,3).forEach(img=>{
+        if(!img.title.match(/\.svg|logo|icon|flag|map/i))titles.push(img.title);
+      }));
+      for(const t of titles.slice(0,2)){
+        if(imgs.length>=3)break;
+        try{
+          const ru=`https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(t)}&prop=imageinfo&iiprop=url&iiurlwidth=800&format=json&origin=*`;
+          const rr=await fetch(ru);const dd=await rr.json();
+          Object.values(dd.query?.pages||{}).forEach(p=>{const u=(p.imageinfo||[])[0]?.thumburl;if(u)imgs.push(u);});
+        }catch(e){}
+      }
+    }
+    imgCache[query]=imgs;
+    const rowNow=document.getElementById(`imgs-${evId}`);if(rowNow)renderImgs(rowNow,imgs);
+  }catch(e){const rowNow=document.getElementById(`imgs-${evId}`);if(rowNow)rowNow.innerHTML='';}
+}
+function renderImgs(row,imgs){
+  if(!imgs||!imgs.length){row.innerHTML='';return;}
+  row.innerHTML=imgs.slice(0,4).map(src=>
+    `<img class="evt-img" src="${src}" alt="" loading="lazy" onclick="openLightbox('${src}')" onerror="this.style.display='none'"/>`
+  ).join('');
+}
+function openLightbox(src){document.getElementById('lbImg').src=src;document.getElementById('lightbox').classList.add('on');}
+function closeLightbox(){document.getElementById('lightbox').classList.remove('on');document.getElementById('lbImg').src='';}
+
+/* ════════════ TIMELINE ════════════ */
+function renderTimeline(){
+  const list=document.getElementById('tlList'),empty=document.getElementById('emptyState');
+  if(!stops.length){empty.style.display='flex';list.innerHTML='';return;}
+  empty.style.display='none';list.innerHTML='';
+  stops.forEach((s,i)=>{
+    const n=nightsBetween(s.arrival,s.departure),act=s.id===activeId;
+    const prev=(s.events||[]).slice(0,2);
+    const prevHtml=prev.map(e=>{
+      const[h,m]=e.time.split(':');const hr=+h,ampm=hr>=12?'PM':'AM',h12=hr%12||12;
+      return`<div class="day-evt-preview"><span class="ep-time">${h12}:${m}${ampm}</span>${e.name}</div>`;
+    }).join('');
+    const moreN=(s.events||[]).length-prev.length;
+    const div=document.createElement('div');
+    div.className=`day-block${act?' active':''}`;div.dataset.id=s.id;
+    div.innerHTML=`
+      <div class="day-spine"><div class="day-dot"></div><div class="day-line"></div></div>
+      <div class="day-content" onclick="setActive(${s.id},true)">
+        <div class="day-date">${fmtDate(s.arrival)}</div>
+        <div class="day-name">${s.location}</div>
+        ${n>0?`<div class="day-meta">${n} night${n!==1?'s':''}${s.departure!==s.arrival?' · until '+fmtDate(s.departure):''}</div>`:''}
+        ${s.stay?`<div class="day-meta">🏨 ${s.stay}</div>`:''}
+        ${!s.mapped?`<div class="no-map-badge">⏳ Locating…</div>`:''}
+        ${prevHtml}
+        ${moreN>0?`<div class="day-meta" style="color:var(--blue)">+${moreN} more…</div>`:''}
+        <div class="day-btns">
+          <button class="day-btn db-detail" onclick="openDrawer(${s.id});event.stopPropagation()">📋 Details</button>
+          <button class="day-btn db-edit"   onclick="openStopModal('edit',${s.id});event.stopPropagation()">✏ Edit</button>
+          <button class="day-btn db-del"    onclick="removeStop(${s.id});event.stopPropagation()">Remove</button>
+        </div>
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+/* ════════════ SIDEBAR HEADER ════════════ */
+function updateSidebarHeader(){
+  const name=tripName||DEFAULT_TRIP;
+  document.getElementById('tripNameEl').textContent=name;
+  document.getElementById('sthTitle').textContent=name;
+  if(!stops.length){['sthSub','sthStops','sthDays'].forEach(id=>document.getElementById(id).textContent='');return;}
+  const first=stops[0].arrival,last=stops[stops.length-1].departure||stops[stops.length-1].arrival;
+  const days=Math.max(1,Math.round((new Date(last)-new Date(first))/86400000)+1);
+  document.getElementById('sthSub').textContent=`${fmtDate(first)} – ${fmtDate(last)}`;
+  document.getElementById('sthStops').textContent=`${stops.length} stop${stops.length!==1?'s':''}`;
+  document.getElementById('sthDays').textContent=`${days} day${days!==1?'s':''}`;
+}
+function renameTripPrompt(){const n=prompt('Rename your trip:',tripName);if(n&&n.trim()){tripName=n.trim();updateSidebarHeader();save();}}
+
+/* ════════════ SCROLL → MAP ════════════ */
+const tlScroll=document.getElementById('tlScroll');let scrollTimer;
+tlScroll.addEventListener('scroll',()=>{
+  clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{
+    const rect=tlScroll.getBoundingClientRect(),midY=rect.top+rect.height/2;
+    let best=null,bestD=Infinity;
+    tlScroll.querySelectorAll('.day-block').forEach(c=>{
+      const cr=c.getBoundingClientRect(),d=Math.abs(cr.top+cr.height/2-midY);
+      if(d<bestD){bestD=d;best=c;}
+    });
+    if(best){
+      const id=+best.dataset.id;
+      if(id!==activeId){
+        activeId=id;const s=stops.find(x=>x.id===id);
+        if(s&&s.mapped){map.panTo([s.lat,s.lng],{animate:true,duration:.7});MK[id]?.openPopup();updateMapCard(s);}
+        refreshIcons();
+        tlScroll.querySelectorAll('.day-block').forEach(c=>c.classList.toggle('active',+c.dataset.id===id));
+      }
+    }
+  },70);
+});
+
+/* ════════════ DATE FINDER ════════════ */
+function findLocation(date){
+  const strip=document.getElementById('resultStrip');
+  if(!date||!stops.length){strip.classList.remove('on');return;}
+  const found=stops.find(s=>date>=s.arrival&&date<=s.departure);
+  if(found){
+    document.getElementById('rsCity').textContent=found.location;
+    document.getElementById('rsSub').textContent=`${fmtDate(date)} · ${fmtRange(found.arrival,found.departure)}`;
+    strip.classList.add('on');
+    activeId=found.id;
+    refreshIcons();renderTimeline();
+    // fly map to location
+    if(found.mapped){
+      map.flyTo([found.lat,found.lng],Math.max(map.getZoom(),10),{duration:1.2});
+      MK[found.id]?.openPopup();
+      updateMapCard(found);
+    }
+    // scroll sidebar to the stop
+    setTimeout(()=>{
+      const el=document.querySelector(`.day-block[data-id="${found.id}"]`);
+      if(el)el.scrollIntoView({behavior:'smooth',block:'center'});
+    },100);
+  }else{
+    document.getElementById('rsCity').textContent='Not scheduled';
+    document.getElementById('rsSub').textContent=`No stop on ${fmtDate(date)}`;
+    strip.classList.add('on');
+  }
+}
+function closeStrip(){document.getElementById('resultStrip').classList.remove('on');document.getElementById('finderDate').value='';}
+
+/* ════════════ UTILS ════════════ */
+const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DOW=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+function fmtDate(d){if(!d)return'—';const[y,m,day]=d.split('-');return`${MO[+m-1]} ${+day}, ${y}`;}
+function fmtDateLong(d){if(!d)return'—';const dt=new Date(d+'T12:00:00');return`${DOW[dt.getDay()]}, ${MO[dt.getMonth()]} ${dt.getDate()}`;}
+function fmtRange(a,b){
+  if(!a)return'—';if(!b||a===b)return fmtDate(a);
+  const[ay,am,ad]=a.split('-'),[by,bm,bd]=b.split('-');
+  if(ay===by&&am===bm)return`${MO[+am-1]} ${+ad}–${+bd}, ${ay}`;
+  if(ay===by)return`${MO[+am-1]} ${+ad} – ${MO[+bm-1]} ${+bd}, ${ay}`;
+  return`${fmtDate(a)} – ${fmtDate(b)}`;
+}
+function nightsBetween(a,b){return!a||!b?0:Math.max(0,Math.round((new Date(b)-new Date(a))/86400000));}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),3000);}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeStopModal();closeLightbox();}});
+window.addEventListener('resize',()=>map.invalidateSize());
+
+/* ════════════ MOBILE VIEW SWITCHING ════════════ */
+function isMobile(){return window.innerWidth<=768;}
+function switchMobView(view){
+  const sidebar=document.querySelector('.sidebar');
+  const mapArea=document.querySelector('.map-area');
+  document.querySelectorAll('.mob-tab').forEach(t=>t.classList.toggle('active',t.dataset.view===view));
+  if(view==='list'){
+    sidebar.classList.add('mob-on');
+    mapArea.classList.add('mob-off');
+  }else{
+    sidebar.classList.remove('mob-on');
+    mapArea.classList.remove('mob-off');
+    setTimeout(()=>map.invalidateSize(),120);
+  }
+}
+// On mobile: clicking a stop in list → switch to map
+const origSetActive=setActive;
+setActive=function(id,fly){
+  origSetActive(id,fly);
+  if(isMobile()&&fly){
+    switchMobView('map');
+  }
+};
+// On mobile: opening drawer doesn't need view switch — it overlays
+const origOpenDrawer=openDrawer;
+openDrawer=function(id){
+  origOpenDrawer(id);
+  // on mobile, ensure drawer is fully visible above current view
+};
+
+/* ════════════ BOOT ════════════ */
+(function boot(){
+  // wipe any old storage keys from previous versions so defaults always show clean
+  ['tripplanner_v2','tripplanner_v3'].forEach(k=>localStorage.removeItem(k));
+
+  const loaded=load();
+  if(!loaded){
+    stops=DEFAULT_STOPS.map(s=>({...s,events:(s.events||[]).map(e=>({...e}))}));
+    tripName=DEFAULT_TRIP;
+  }
+  stops.sort((a,b)=>a.arrival.localeCompare(b.arrival));
+  save();
+
+  updateSidebarHeader();
+  stops.forEach(s=>{if(s.mapped&&s.lat)placeMarker(s);});
+  refreshIcons();drawRoute();
+  renderTimeline();  // ← always called, stops.length > 0 guaranteed with defaults
+
+  const geo=stops.filter(s=>s.mapped);
+  if(geo.length>1)map.fitBounds(L.latLngBounds(geo.map(s=>[s.lat,s.lng])),{padding:[40,40]});
+  else if(geo.length===1)map.setView([geo[0].lat,geo[0].lng],9);
+
+  if(stops.length)setActive(stops[0].id,false);
+})();
