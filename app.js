@@ -179,6 +179,7 @@ function createTrip(){
     tripRef.set(data).then(()=>{
       toast('Trip created! Share code: '+tripCode);
       listenForChanges();
+      initPresence();
     });
   }
   bootApp(DEFAULT_STOPS,DEFAULT_TRIP);
@@ -204,6 +205,7 @@ function joinTrip(){
         }));
         bootApp(loadedStops,d.tripName||DEFAULT_TRIP);
         listenForChanges();
+        initPresence();
         toast('Joined trip '+tripCode+'!');
       }else{
         toast('Trip not found. Check the code or create a new trip.');
@@ -284,6 +286,67 @@ function listenForChanges(){
     try{localStorage.setItem(STORAGE_KEY,JSON.stringify({tripName,stops}));}catch(e){}
   });
 }
+
+/* ════════════ PRESENCE ════════════ */
+const PRESENCE_COLORS=['#4285f4','#ea4335','#34a853','#f9ab00','#9334e6','#e52592','#007b83','#e37400'];
+let presenceRef=null, myPresenceRef=null;
+
+function initPresence(){
+  if(!db||!tripCode||!userName)return;
+  presenceRef=db.ref('presence/'+tripCode);
+  const uid=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  myPresenceRef=presenceRef.child(uid);
+  // Set my presence and auto-remove on disconnect
+  myPresenceRef.set({name:userName,ts:firebase.database.ServerValue.TIMESTAMP});
+  myPresenceRef.onDisconnect().remove();
+  // Keep alive — update timestamp every 60s
+  setInterval(()=>{
+    if(myPresenceRef)myPresenceRef.update({ts:firebase.database.ServerValue.TIMESTAMP});
+  },60000);
+  // Listen for all present users
+  presenceRef.on('value',snap=>{
+    const el=document.getElementById('presence');
+    if(!el)return;
+    const users=[];
+    const now=Date.now();
+    snap.forEach(c=>{
+      const u=c.val();
+      // Only show users active in last 2 minutes
+      if(u.ts&&now-u.ts<120000)users.push(u.name);
+    });
+    renderPresence(users);
+  });
+  // Clean up stale entries periodically
+  setInterval(()=>{
+    presenceRef.once('value').then(snap=>{
+      const now=Date.now();
+      snap.forEach(c=>{
+        const u=c.val();
+        if(u.ts&&now-u.ts>120000)presenceRef.child(c.key).remove();
+      });
+    });
+  },60000);
+}
+
+function renderPresence(names){
+  const el=document.getElementById('presence');
+  if(!el)return;
+  el.innerHTML='';
+  names.forEach((name,i)=>{
+    const initials=name.split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2);
+    const color=PRESENCE_COLORS[i%PRESENCE_COLORS.length];
+    const av=document.createElement('div');
+    av.className='av';
+    av.style.background=color;
+    av.innerHTML=initials+'<span class="av-tip">'+name+'</span>';
+    el.appendChild(av);
+  });
+}
+
+// Clean up on page unload
+window.addEventListener('beforeunload',()=>{
+  if(myPresenceRef)myPresenceRef.remove();
+});
 
 function clearMarkers(){
   Object.keys(MK).forEach(id=>{map.removeLayer(MK[id]);delete MK[id];});
@@ -1030,6 +1093,7 @@ function bootApp(stopsData,name){
         bootApp(DEFAULT_STOPS,DEFAULT_TRIP);
       }
       listenForChanges();
+      initPresence();
     }).catch(()=>{
       // Offline — load from localStorage cache
       try{
